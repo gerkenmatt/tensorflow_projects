@@ -37,7 +37,10 @@ def eeg_cnn_model_fn(features, labels, mode):
   # First max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 640, 96]
   # Output Tensor Shape: [batch_size, 320, 96]
-  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+  pool1 = tf.layers.max_pooling2d(
+    inputs=conv1, 
+    pool_size=[2, 1], 
+    strides=[2, 1])
 
 
   print("\nPOOL1 OUTPUT SHAPE: \n", str(pool1.shape))
@@ -60,15 +63,42 @@ def eeg_cnn_model_fn(features, labels, mode):
   # Second max pooling layer with a 2x2 filter and stride of 2
   # Input Tensor Shape: [batch_size, 320, 192]
   # Output Tensor Shape: [batch_size, 160, 192]
-  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 1], strides=2)
+  pool2 = tf.layers.max_pooling2d(
+    inputs=conv2, 
+    pool_size=[2, 1], 
+    strides=[2,1])
   print("\nPOOL2 OUTPUT SHAPE: \n", str(pool2.shape))
 
+
+  # Convolutional Layer #3
+  # Computes 64 features using a 5x5 filter.
+  # Padding is added to preserve width and height.
+  # Input Tensor Shape: [batch_size, 320, 96]
+  # Output Tensor Shape: [batch_size, 192]
+  # conv3 = tf.layers.conv2d(
+  #     inputs=pool2,
+  #     filters=64,
+  #     kernel_size=[5, 1],
+  #     padding="same",
+  #     activation=tf.nn.relu)
+  # print("\nCONV3 OUTPUT SHAPE: \n", str(conv3.shape))
+
+
+  # # Pooling Layer #3
+  # # Second max pooling layer with a 2x2 filter and stride of 2
+  # # Input Tensor Shape: [batch_size, 320, 192]
+  # # Output Tensor Shape: [batch_size, 160, 192]
+  # pool3 = tf.layers.max_pooling2d(
+  #   inputs=conv3, 
+  #   pool_size=[2, 1], 
+  #   strides=[2,1])
+  # print("\nPOOL3 OUTPUT SHAPE: \n", str(pool3.shape))
 
   # Flatten tensor into a batch of vectors
   # Input Tensor Shape: [batch_size, 160, 192]
   # Output Tensor Shape: [batch_size, 160 * 192]
-  pool2_flat = tf.reshape(pool2, [-1, 160 * 64])
-  print("\nPOOL2_FLAT OUTPUT SHAPE: \n", str(pool2_flat.shape))
+  pool2_flat = tf.reshape(pool2, [-1, 160* 3 * 64])
+  print("\nPOOL3_FLAT OUTPUT SHAPE: \n", str(pool2_flat.shape))
   
 
   # Dense Layer
@@ -76,19 +106,26 @@ def eeg_cnn_model_fn(features, labels, mode):
   # Input Tensor Shape: [batch_size, 160 * 192]
   # TODO: find out the number of neurons
   # Output Tensor Shape: [batch_size, 1024]
-  dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+  dense = tf.layers.dense(
+    inputs=pool2_flat, 
+    units=1024, 
+    activation=tf.nn.relu)
   print("\nDENSE OUTPUT SHAPE: \n", str(dense.shape))
 
 
   # Add dropout operation; 0.6 probability that element will be kept
   dropout = tf.layers.dropout(
-      inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+      inputs=dense, 
+      rate=0.4, 
+      training=mode == tf.estimator.ModeKeys.TRAIN)
   print("\nDROPOUT OUTPUT SHAPE: \n", str(dropout.shape))
 
   # Logits layer
   # Input Tensor Shape: [batch_size, 1024]
   # Output Tensor Shape: [batch_size, 10]
-  logits = tf.layers.dense(inputs=dropout, units=10)
+  logits = tf.layers.dense(
+    inputs=dropout, 
+    units=2)
   print("\nLOGITS OUTPUT SHAPE: \n", str(logits.shape))
 
   predictions = {
@@ -130,13 +167,13 @@ def main(unused_argv):
   # Load training and eval data
   data = get_eeg_data()
   eeg_data = data[0]
-  eeg_labels = data[1]
+  eeg_labels = data[1] - 1
   print("EEG DATA SHAPE: ", str(data[0].shape))
   print("EEG LABELS SHAPE: ", str(data[1].shape))
-  eeg_train_data = eeg_data[:150,:]
-  eeg_train_labels = eeg_labels[:150]
-  eeg_eval_data = eeg_data[150:, :]
-  eeg_eval_labels = eeg_labels[150:]
+  eeg_train_data = eeg_data[:4200,:]
+  eeg_train_labels = eeg_labels[:4200]
+  eeg_eval_data = eeg_data[4200:, :]
+  eeg_eval_labels = eeg_labels[4200:]
   print("EEG TRAIN DATA SHAPE: ", str(eeg_train_data.shape))
   print("EEG EVAL DATA SHAPE: ", str(eeg_eval_data.shape))
   print("EEG TRAIN LABELS SHAPE: ", str(eeg_train_labels.shape))
@@ -166,13 +203,13 @@ def main(unused_argv):
   train_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={"x": eeg_train_data},
       y=eeg_train_labels,
-      batch_size=100,
+      batch_size=20,
       num_epochs=None,
       shuffle=True)
   print("fukkkkkkkkkkkk\n")
   mnist_classifier.train(
       input_fn=train_input_fn,
-      steps=150,
+      steps=1000,
       hooks=[logging_hook])
 
   print("\n\nDONE TRAINING: NOW EVALUATE\n\n")
