@@ -26,8 +26,8 @@ def eeg_cnn_model_big_fn(features, labels, mode):
   print (input_layer[1])
   conv1 = tf.layers.conv2d(
       inputs=input_layer,
-      filters=32,
-      kernel_size=[5, 1],
+      filters=64,
+      kernel_size=[10, 1],
       padding="same",
       activation=tf.nn.relu)
 
@@ -53,7 +53,7 @@ def eeg_cnn_model_big_fn(features, labels, mode):
   conv2 = tf.layers.conv2d(
       inputs=pool1,
       filters=64,
-      kernel_size=[5, 1],
+      kernel_size=[7, 1],
       padding="same",
       activation=tf.nn.relu)
   print("\nCONV2 OUTPUT SHAPE: \n", str(conv2.shape))
@@ -170,7 +170,7 @@ def eeg_cnn_model_big_fn(features, labels, mode):
   # Configure the Training Op (for TRAIN mode)
   if mode == tf.estimator.ModeKeys.TRAIN:
     print("howdy\n")
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.002)
     print("partner\n")
     train_op = optimizer.minimize(
         loss=loss,

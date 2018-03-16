@@ -7,7 +7,8 @@ import tensorflow as tf
 from eeg_parser import get_eeg_data
 import matplotlib.pyplot as plt
 import time
-from cnn_eeg_big import eeg_cnn_model_big_fn
+from cnn_eeg_4deep import eeg_cnn_model_4deep_fn
+import pywt
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -173,11 +174,22 @@ def main(unused_argv):
   print("EEG EVAL LABELS SHAPE: ", str(eeg_eval_labels.shape))
 
 
+  # cA, cD = pywt.dwt(eeg_train_data[2], 'db1')
+
+
+  # fig1 = plt.figure(1) 
+  # plt.plot(cD, cA, "r")
+  # fig2 = plt.figure(2)
+  # # plt.plot(cD, "b")
+  # # fig3 = plt.figure(3)
+  # plt.plot(eeg_train_data[11], "g")
+  # plt.show()
+
   start_time = time.time()
 
   # Create the Estimator
   eeg_classifier = tf.estimator.Estimator(
-      model_fn=eeg_cnn_model_big_fn, model_dir="/tmp/eeg_convnet_model")
+      model_fn=eeg_cnn_model_4deep_fn, model_dir="/tmp/eeg_convnet_model")
 
   # Set up logging for predictions
   # Log the values in the "Softmax" tensor with label "probabilities"
@@ -190,6 +202,7 @@ def main(unused_argv):
   num_runs = 20
   steps_completed = 0
   steps_per_train = 250
+  accuracies.append(0.5)
 
   # Train the model
   for i in range(num_runs):

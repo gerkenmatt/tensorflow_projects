@@ -162,6 +162,7 @@ def get_eeg_data():
 	eval_data = np.asarray(eval_data)
 	eval_labels = np.asarray(eval_labels)
 
+	
 	train_data, train_labels = randomize_data(train_data, train_labels)
 	eval_data, eval_labels = randomize_data(eval_data, eval_labels)
 
