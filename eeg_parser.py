@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 
 # import matplotlib.pyplot as plt
 import numpy as np
+import scipy.fftpack
+from scipy import signal
 import pyedflib
 
 
@@ -38,6 +40,70 @@ def randomize_data(data, labels):
 	np.random.set_state(rng_state)
 	np.random.shuffle(labels)
 	return data, labels
+
+def eeg_fft_plot(signal): 
+	N = len(signal)		#number of samples
+	T = 1.0 / 160 		#sampling period
+	x = np.linspace(0.0, N*T, N)
+	y = signal
+	yf = scipy.fftpack.fft(y)
+	xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
+
+	fig, ax = plt.subplots()
+	ax.plot(xf, 2.0/N * np.abs(yf[:N//2]))
+	plt.show()
+
+def eeg_power_spectral_density_plot(sig, num_channels): 
+	fs = 160
+	N  = int(len(sig) / num_channels)
+
+	for i in range(num_channels): 
+		f, Pxx_den = signal.periodogram(sig[i*N:i*N+N], fs)
+		Pxx_den[0] = Pxx_den[1]
+		# plt.ylim([1e-3, 1e3])
+		plt.semilogy(f, Pxx_den)
+
+	plt.xlabel('frequency [Hz]')
+	plt.ylabel('PSD [V**2/Hz]')
+	plt.show()
+
+def eeg_fir_bandpass_plot(sig, num_channels): 
+	fs = 160
+	nyq = fs / 2.0
+	N  = int(len(sig) / num_channels)
+
+	#create FIR filter
+	taps = signal.firwin(N, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
+	
+	for i in range(num_channels): 
+		filtered_sig = signal.lfilter(taps, 1.0, sig[i*N:i*N+N])
+		f, Pxx_den = signal.periodogram(filtered_sig, fs)
+		Pxx_den[0] = Pxx_den[1]
+		# plt.ylim([1e-3, 1e3])
+		plt.semilogy(f, Pxx_den)
+
+
+	plt.xlabel('frequency [Hz]')
+	plt.ylabel('PSD [V**2/Hz]')
+	plt.show()
+
+def eeg_fir_bandpass(eeg_data, num_channels): 
+	fs = 160 
+	nyq = fs / 2.0
+	N  = int(len(eeg_data[0]) / num_channels)
+	print("FIR Bandpass Filtering signals")
+
+	#create FIR filter
+	taps = signal.firwin(N, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
+	
+	#iterate through all examples in the eeg data
+	for sig in eeg_data:
+		#iterate through each channel
+		for i in range(num_channels): 
+			filtered_sig = signal.lfilter(taps, 1.0, sig[i*N:i*N+N])
+			sig[i*N:i*N+N] = filtered_sig
+
+	print("Done filtering")
 
 
 def get_eeg_data():
@@ -146,6 +212,7 @@ def get_eeg_data():
 				eval_labels.append(eeg_data_labels[i])
 
 	elif runType == RunTypes.ShuffleAll: 
+		print("SHUFFLING EXAMPLES")
 		# flatten the data into np arrays
 		eeg_data = np.asarray(eeg_data)
 		eeg_data_labels = np.asarray(eeg_data_labels)
