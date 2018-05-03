@@ -7,7 +7,7 @@ import tensorflow as tf
 from eeg_parser import get_eeg_data
 import matplotlib.pyplot as plt
 import time
-from cnn_preprocessed_eeg import eeg_cnn_model_preprocessed_fn
+from cnn_eeg_5deep import eeg_cnn_model_5deep_fn
 import pywt
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -160,84 +160,6 @@ def eeg_cnn_model_fn(features, labels, mode):
   return tf.estimator.EstimatorSpec(
       mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
-def energy_percents(sig):
-	w = pywt.Wavelet('db4')
-	cA6, cD6, cD5, cD4, cD3, cD2, cD1 = pywt.wavedec(sig, 'db2', mode='constant', level=6)
-	e1 = sum(abs(cD1)**2)/len(cD1)
-	e2 = sum(abs(cD2)**2)/len(cD2)
-	e3 = sum(abs(cD3)**2)/len(cD3)
-	e4 = sum(abs(cD4)**2)/len(cD4)
-	e5 = sum(abs(cD5)**2)/len(cD5)
-	e6 = sum(abs(cD6)**2)/len(cD6)
-	et = e1 + e2 + e3 + e4 + e5 + e6
-	return [round(e1/et, 3), round(e2/et, 3), round(e3/et, 3), round(e4/et,3), round(e5/et,3), round(e6/et, 3)]
-
-def process_data(data): 
-	processed_data = []
-
-	#preprocessing for signals
-	for sig in data:
-		processed_signal = []
-
-		#get the energy percentages for each channel of the signal
-		ep1 = energy_percents(sig[0:320])
-		ep2 = energy_percents(sig[320:640])
-		ep3 = energy_percents(sig[640:960])
-		processed_signal.append(ep1[3])
-		processed_signal.append(ep1[4])
-		processed_signal.append(ep1[5])
-		processed_signal.append(ep2[3])
-		processed_signal.append(ep2[4])
-		processed_signal.append(ep2[5])
-		processed_signal.append(ep3[3])
-		processed_signal.append(ep3[4])
-		processed_signal.append(ep3[5])
-		processed_data.append(processed_signal)
-
-
-	# print("Shape of processed data: ", len(processed_data), " x ", len(processed_data[0]))
-	return processed_data
-
-def energy_bar_graph(data): 
-	e_band1 = []
-	e_band2 = []
-	e_band3 = []
-	e_band4 = []
-	e_band5 = []
-	e_band6 = []
-	e_band7 = []
-	e_band8 = []
-	e_band9 = []
-
-	print("DATA SHAPE: ", data.shape)
-
-
-	for i in range(int(len(data) /5)): 
-		# print(i)
-		e_band1.append(data[i][0])
-		e_band2.append(data[i][1])
-		e_band3.append(data[i][2])
-		e_band4.append(data[i][3])
-		e_band5.append(data[i][4])
-		e_band6.append(data[i][5])
-		e_band7.append(data[i][6])
-		e_band8.append(data[i][7])
-		e_band9.append(data[i][8])
-
-	# e_band1.sort()
-	# e_band2.sort()
-	# e_band3.sort()
-	# e_band4.sort()
-	# e_band5.sort()
-	# e_band6.sort()
-	# e_band7.sort()
-	# e_band8.sort()
-	# e_band9.sort()
-	print("printing plot")
-	e_bands = e_band9 + e_band8 + e_band7 + e_band6 + e_band5 + e_band4 + e_band3 + e_band2 + e_band1 
-	plt.bar(range(len(e_bands)), e_bands, align='center', alpha=0.5)
-	plt.show()
-
 def main(unused_argv):
 	# Load training and eval data"
 	print("starting")
@@ -251,14 +173,15 @@ def main(unused_argv):
 	print("EEG TRAIN LABELS SHAPE: ", str(eeg_train_labels.shape))
 	print("EEG EVAL LABELS SHAPE: ", str(eeg_eval_labels.shape))
 
-	processed_train_data = np.asarray(process_data(eeg_train_data))
-	processed_eval_data = np.asarray(process_data(eeg_eval_data))
+	# processed_train_data = np.asarray(process_data(eeg_train_data))
+	# processed_eval_data = np.asarray(process_data(eeg_eval_data))
 
-	print("processed train data shape: ", str(processed_train_data.shape))
-	print("processed eval data shape: ", str(processed_eval_data.shape))
+	# print("processed train data shape: ", str(processed_train_data.shape))
+	# print("processed eval data shape: ", str(processed_eval_data.shape))
 
 
-	energy_bar_graph(processed_train_data)
+	# energy_bar_graph(processed_train_data)
+	# energy_bar_graph(processed_eval_data)
 
 	# w = pywt.Wavelet('db4')
 	# print(w)
@@ -282,7 +205,7 @@ def main(unused_argv):
 
 	# Create the Estimator
 	eeg_classifier = tf.estimator.Estimator(
-	  model_fn=eeg_cnn_model_preprocessed_fn, model_dir="/tmp/eeg_convnet_model")
+	  model_fn=eeg_cnn_model_5deep_fn, model_dir="/tmp/eeg_convnet_model")
 
 	# Set up logging for predictions
 	# Log the values in the "Softmax" tensor with label "probabilities"
@@ -292,7 +215,7 @@ def main(unused_argv):
 
 
 	accuracies = []
-	num_runs = 20
+	num_runs = 10
 	steps_completed = 0
 	steps_per_train = 250
 	accuracies.append(0.5)
@@ -300,9 +223,9 @@ def main(unused_argv):
 	# Train the model
 	for i in range(num_runs):
 		train_input_fn = tf.estimator.inputs.numpy_input_fn(
-		    x={"x": processed_train_data},
+		    x={"x": eeg_train_data},
 		    y=eeg_train_labels,
-		    batch_size=100,
+		    batch_size=20,
 		    num_epochs=None,
 		    shuffle=True)
 		eeg_classifier.train(
@@ -313,7 +236,7 @@ def main(unused_argv):
 		steps_completed += steps_per_train
 		# Evaluate the model and print results
 		eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-		    x={"x": processed_eval_data},
+		    x={"x": eeg_eval_data},
 		    y=eeg_eval_labels,
 		    num_epochs=1,
 		    shuffle=False)
@@ -336,8 +259,8 @@ def main(unused_argv):
 	     title='Test Results')
 	ax.grid()
 
-  # fig.savefig("test.png")
-  #plt.show()
+	fig.savefig("test.png")
+	plt.show()
 
 if __name__ == "__main__":
   tf.app.run()
