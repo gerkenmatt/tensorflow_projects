@@ -41,69 +41,6 @@ def randomize_data(data, labels):
 	np.random.shuffle(labels)
 	return data, labels
 
-def eeg_fft_plot(signal): 
-	N = len(signal)		#number of samples
-	T = 1.0 / 160 		#sampling period
-	x = np.linspace(0.0, N*T, N)
-	y = signal
-	yf = scipy.fftpack.fft(y)
-	xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
-
-	fig, ax = plt.subplots()
-	ax.plot(xf, 2.0/N * np.abs(yf[:N//2]))
-	plt.show()
-
-def eeg_power_spectral_density_plot(sig, num_channels): 
-	fs = 160
-	N  = int(len(sig) / num_channels)
-
-	for i in range(num_channels): 
-		f, Pxx_den = signal.periodogram(sig[i*N:i*N+N], fs)
-		Pxx_den[0] = Pxx_den[1]
-		# plt.ylim([1e-3, 1e3])
-		plt.semilogy(f, Pxx_den)
-
-	plt.xlabel('frequency [Hz]')
-	plt.ylabel('PSD [V**2/Hz]')
-	plt.show()
-
-def eeg_fir_bandpass_plot(sig, num_channels): 
-	fs = 160
-	nyq = fs / 2.0
-	N  = int(len(sig) / num_channels)
-
-	#create FIR filter
-	taps = signal.firwin(N, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
-	
-	for i in range(num_channels): 
-		filtered_sig = signal.lfilter(taps, 1.0, sig[i*N:i*N+N])
-		f, Pxx_den = signal.periodogram(filtered_sig, fs)
-		Pxx_den[0] = Pxx_den[1]
-		# plt.ylim([1e-3, 1e3])
-		plt.semilogy(f, Pxx_den)
-
-
-	plt.xlabel('frequency [Hz]')
-	plt.ylabel('PSD [V**2/Hz]')
-	plt.show()
-
-def eeg_fir_bandpass(eeg_data, num_channels): 
-	fs = 160 
-	nyq = fs / 2.0
-	N  = int(len(eeg_data[0]) / num_channels)
-	print("FIR Bandpass Filtering signals")
-
-	#create FIR filter
-	taps = signal.firwin(N, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
-	
-	#iterate through all examples in the eeg data
-	for sig in eeg_data:
-		#iterate through each channel
-		for i in range(num_channels): 
-			filtered_sig = signal.lfilter(taps, 1.0, sig[i*N:i*N+N])
-			sig[i*N:i*N+N] = filtered_sig
-
-	print("Done filtering")
 
 
 def get_eeg_data():
@@ -130,20 +67,20 @@ def get_eeg_data():
 
 		#iterate through the EDF num_records in the directory (S001R01.edf, S001R02.edf,..., S001R14.edf)
 		for r_num in records: 
-			#create new EdfReader for the EDF record
+			print("   record num: ", r_num)
+
+			#create new EdfReader for the EDF record file
 			edf_fname = 'S' + '%03d' % i + 'R' + r_num + '.edf'
 			edf_fname = os.path.join(direc, edf_fname)
-
 			edf = pyedflib.EdfReader(edf_fname)
 			
 			start_samples = []
 			cur_tasks = []
 			cur_states = []
-
 			ann_fname = '/ann' + r_num + '.txt'
 			ann_fname = direc + ann_fname
 
-			#create array of starting samples for each task in the ann-file (0, 672, 1328,...)
+			#create array of starting samples for each task(T0, T1, T2) in the ann-file (i.e sample# 0, 672, 1328,...)
 			#create array of labels for each task in the ann-file (T0, T1, T2)
 			with open(ann_fname) as fobj:
 				for line in fobj: 
@@ -154,6 +91,7 @@ def get_eeg_data():
 			#change the tasks to state values (rest, left_fist, right_fist,...)
 			for task in cur_tasks: 
 				cur_states.append(state_table[int(r_num) - 1][int(task[1])])
+
 
 			#iterate through the thirty 4-second subsignals
 			for k in range(len(start_samples)):
@@ -225,21 +163,18 @@ def get_eeg_data():
 		eval_data = eeg_data[7000:, :]
 		eval_labels = eeg_data_labels[7000:]
 		 
-
 	print("training data shape: ", str(len(train_data)))
 	print("eval data shape: ", str(len(eval_data)))
 	train_data = np.asarray(train_data)
 	train_labels = np.asarray(train_labels)
 	eval_data = np.asarray(eval_data)
 	eval_labels = np.asarray(eval_labels)
-
 	
 	train_data, train_labels = randomize_data(train_data, train_labels)
 	eval_data, eval_labels = randomize_data(eval_data, eval_labels)
 
-
-
 	return train_data, train_labels, eval_data, eval_labels
+
 
 def print_eeg_samples(eeg_data, patient_nums, record_nums, sample_nums, eeg_data_labels):
 	fig1 = plt.figure(1)

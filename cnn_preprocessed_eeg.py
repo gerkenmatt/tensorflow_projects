@@ -5,10 +5,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from eeg_parser import get_eeg_data
-from eeg_parser import eeg_fft_plot
-from eeg_parser import eeg_power_spectral_density_plot
-from eeg_parser import eeg_fir_bandpass_plot
-from eeg_parser import eeg_fir_bandpass
+from eeg_preprocessing import eeg_fft_plot
+from eeg_preprocessing  import eeg_power_spectral_density_plot
+from eeg_preprocessing import eeg_fir_bandpass_plot
+from eeg_preprocessing import eeg_fir_bandpass
+from eeg_preprocessing import process_data
+from eeg_preprocessing  import energy_percents
+from eeg_preprocessing import input_energy_graph
+from eeg_preprocessing import energy_band_percent_graphs
 import matplotlib.pyplot as plt
 import time
 import pywt
@@ -41,17 +45,17 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 
 	print("\nCONV1 OUTPUT SHAPE: \n", str(conv1.shape))
 
-	# Pooling Layer #1
-	# First max pooling layer with a 2x2 filter and stride of 2
-	# Input Tensor Shape: [batch_size, 640, 96]
-	# Output Tensor Shape: [batch_size, 320, 96]
-	pool1 = tf.layers.max_pooling2d(
-	inputs=conv1, 
-	pool_size=[2, 1], 
-	strides=[2, 1])
+	# # Pooling Layer #1
+	# # First max pooling layer with a 2x2 filter and stride of 2
+	# # Input Tensor Shape: [batch_size, 640, 96]
+	# # Output Tensor Shape: [batch_size, 320, 96]
+	# pool1 = tf.layers.max_pooling2d(
+	# inputs=conv1, 
+	# pool_size=[2, 1], 
+	# strides=[2, 1])
 
 
-	print("\nPOOL1 OUTPUT SHAPE: \n", str(pool1.shape))
+	# print("\nPOOL1 OUTPUT SHAPE: \n", str(pool1.shape))
 
 	# # Convolutional Layer #2
 	# # Computes 64 features using a 5x5 filter.
@@ -105,8 +109,8 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Flatten tensor into a batch of vectors
 	# Input Tensor Shape: [batch_size, 160, 192]
 	# Output Tensor Shape: [batch_size, 160 * 192]
-	pool1_flat = tf.reshape(pool1, [-1, pool1.shape[1]*  8])
-	print("\nPOOL1_FLAT OUTPUT SHAPE: \n", str(pool1_flat.shape))
+	conv1_flat = tf.reshape(conv1, [-1, conv1.shape[1]*  8])
+	print("\nCONV1_FLAT OUTPUT SHAPE: \n", str(conv1_flat.shape))
 
 
 	# Dense Layer
@@ -115,7 +119,7 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# TODO: find out the number of neurons
 	# Output Tensor Shape: [batch_size, 1024]
 	dense = tf.layers.dense(
-	inputs=pool1_flat, 
+	inputs=conv1_flat, 
 	units=1024, 
 	activation=tf.nn.relu)
 	print("\nDENSE OUTPUT SHAPE: \n", str(dense.shape))
@@ -164,148 +168,6 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	return tf.estimator.EstimatorSpec(
 	  mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
-def energy_percents(sig):
-	w = pywt.Wavelet('db4')
-	cA6, cD6, cD5, cD4, cD3, cD2, cD1 = pywt.wavedec(sig, 'db2', mode='constant', level=6)
-	e1 = sum(abs(cD1)**2)/len(cD1)
-	e2 = sum(abs(cD2)**2)/len(cD2)
-	e3 = sum(abs(cD3)**2)/len(cD3)
-	e4 = sum(abs(cD4)**2)/len(cD4)
-	e5 = sum(abs(cD5)**2)/len(cD5)
-	e6 = sum(abs(cD6)**2)/len(cD6)
-	et = e1 + e2 + e3 + e4 + e5 + e6
-	return [round(e1/et, 3), round(e2/et, 3), round(e3/et, 3), round(e4/et,3), round(e5/et,3), round(e6/et, 3)]
-
-def process_data(data): 
-	processed_data = []
-
-	eeg_fir_bandpass(data, 3)
-	#preprocessing for signals
-	for sig in data:
-		processed_signal = []
-
-		#get the energy percentages for each channel of the signal
-		ep_ch_1 = energy_percents(sig[0:320])
-		ep_ch_2 = energy_percents(sig[320:640])
-		ep_ch_3 = energy_percents(sig[640:960])
-		processed_signal.append(ep_ch_1[3])
-		processed_signal.append(ep_ch_1[4])
-		processed_signal.append(ep_ch_1[5])
-		processed_signal.append(ep_ch_2[3])
-		processed_signal.append(ep_ch_2[4])
-		processed_signal.append(ep_ch_2[5])
-		processed_signal.append(ep_ch_3[3])
-		processed_signal.append(ep_ch_3[4])
-		processed_signal.append(ep_ch_3[5])
-		processed_data.append(processed_signal)
-
-
-	# print("Shape of processed data: ", len(processed_data), " x ", len(processed_data[0]))
-	return processed_data
-
-def input_energy_graph(data): 
-	e_band1 = []
-	e_band2 = []
-	e_band3 = []
-	e_band4 = []
-	e_band5 = []
-	e_band6 = []
-	e_band7 = []
-	e_band8 = []
-	e_band9 = []
-
-	print("DATA SHAPE: ", data.shape)
-
-
-	for i in range(int(len(data) /5)): 
-		# print(i)
-		e_band1.append(data[i][0])
-		e_band2.append(data[i][1])
-		e_band3.append(data[i][2])
-		e_band4.append(data[i][3])
-		e_band5.append(data[i][4])
-		e_band6.append(data[i][5])
-		e_band7.append(data[i][6])
-		e_band8.append(data[i][7])
-		e_band9.append(data[i][8])
-
-	# e_band1.sort()
-	# e_band2.sort()
-	# e_band3.sort()
-	# e_band4.sort()
-	# e_band5.sort()
-	# e_band6.sort()
-	# e_band7.sort()
-	# e_band8.sort()
-	# e_band9.sort()
-	print("printing plot")
-	e_bands = e_band9 + e_band8 + e_band7 + e_band6 + e_band5 + e_band4 + e_band3 + e_band2 + e_band1 
-	plt.bar(range(len(e_bands)), e_bands, align='center', alpha=0.5)
-	plt.show()
-
-'''prints plots of energy band percentages for each of the 
-	motor movement states'''
-def energy_band_percent_graphs(eeg_data, eeg_data_labels): 
-
-	num_states = 2
-	num_channels = 3
-	eps_states = [[] for x in range(num_states)]
-
-	print("Printing energy band percent graphs")
-	print(eeg_data_labels)
-
-	#iterate through all of the eeg signal examples
-	for i in range(int(len(eeg_data)/5)):
-
-		#get the energy percentages for each channel of the signal
-		ep_ch1 = energy_percents(eeg_data[i][0:320])
-		ep_ch2 = energy_percents(eeg_data[i][320:640])
-		ep_ch3 = energy_percents(eeg_data[i][640:960])
-
-		#collect the energy percent lists in the proper state
-		eps_states[eeg_data_labels[i]].append([ep_ch1, ep_ch2, ep_ch3])
-
-	print("There are ", str(len(eps_states[0])), " right hand examples")
-	print("There are ", str(len(eps_states[1])), " left hand examples")
-
-	eps_avg_states = []
-
-	#average the energy percents for each channel of each state
-	for eps_state in eps_states:
-
-		#lists for storing the averages of each percentages for each channel
-		channel_eps = []
-		channel_eps.append([0] * 6) 
-		channel_eps.append([0] * 6) 
-		channel_eps.append([0] * 6) 
-
-		#iterate through each example beloning to this state
-		for eps_example in eps_state: 
-
-			#iterate through each channel of the example
-			for i in range(num_channels): 
-				#this leaves us with the energy percent list
-				eps = eps_example[i]
-
-				#accumulate ep values 
-				channel_eps[i] = [a + b for a, b in zip(channel_eps[i], eps)]
-
-		channel_eps = [[val / len(eps_state) for val in eps] for eps in channel_eps]
-		eps_avg_states.append(channel_eps)
-
-	fig1 = plt.figure(1)
-	right_plot = eps_avg_states[0][0] + eps_avg_states[0][1] + eps_avg_states[0][2]
-	plt.bar(range(len(right_plot)), right_plot, align='center', alpha=0.5)
-	
-	fig2 = plt.figure(2)
-	left_plot = eps_avg_states[1][0] + eps_avg_states[1][1] + eps_avg_states[1][2]
-	plt.bar(range(len(left_plot)), left_plot, align='center', alpha=0.5)
-	
-	plt.show()
-
-
-
-
 
 def main(unused_argv):
 	# Load training and eval data"
@@ -325,13 +187,13 @@ def main(unused_argv):
 	processed_train_data = np.asarray(process_data(eeg_train_data))
 	processed_eval_data = np.asarray(process_data(eeg_eval_data))
 
-	eeg_power_spectral_density_plot(eeg_train_data[22], 3)
+	# eeg_power_spectral_density_plot(eeg_train_data[22], 3)
 	# eeg_fir_bandpass_plot(eeg_train_data[22], 3)
 
 	print("processed train data shape: ", str(processed_train_data.shape))
 	print("processed eval data shape: ", str(processed_eval_data.shape))
 
-	energy_band_percent_graphs(eeg_train_data, eeg_train_labels)
+	# energy_band_percent_graphs(eeg_train_data, eeg_train_labels)
 
 	# energy_bar_graph(processed_train_data)
 	# energy_bar_graph(processed_eval_data)
@@ -370,7 +232,7 @@ def main(unused_argv):
 	accuracies = []
 	num_runs = 100
 	steps_completed = 0
-	steps_per_train = 250
+	steps_per_train = 100
 	accuracies.append(0.5)
 
 	# Train the model
@@ -389,8 +251,8 @@ def main(unused_argv):
 		steps_completed += steps_per_train
 		# Evaluate the model and print results
 		eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-			x={"x": processed_train_data},
-			y=eeg_train_labels,
+			x={"x": processed_eval_data},
+			y=eeg_eval_labels,
 			num_epochs=1,
 			shuffle=False)
 

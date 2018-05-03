@@ -5,6 +5,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from eeg_parser import get_eeg_data
+from eeg_preprocessing import eeg_fft_plot
+from eeg_preprocessing  import eeg_power_spectral_density_plot
+from eeg_preprocessing import eeg_fir_bandpass_plot
+from eeg_preprocessing import eeg_fir_bandpass
 import matplotlib.pyplot as plt
 import time
 from cnn_eeg_5deep import eeg_cnn_model_5deep_fn
@@ -173,33 +177,8 @@ def main(unused_argv):
 	print("EEG TRAIN LABELS SHAPE: ", str(eeg_train_labels.shape))
 	print("EEG EVAL LABELS SHAPE: ", str(eeg_eval_labels.shape))
 
-	# processed_train_data = np.asarray(process_data(eeg_train_data))
-	# processed_eval_data = np.asarray(process_data(eeg_eval_data))
-
-	# print("processed train data shape: ", str(processed_train_data.shape))
-	# print("processed eval data shape: ", str(processed_eval_data.shape))
-
-
-	# energy_bar_graph(processed_train_data)
-	# energy_bar_graph(processed_eval_data)
-
-	# w = pywt.Wavelet('db4')
-	# print(w)
-	# # cA, cD = pywt.dwt(eeg_train_data[2], 'db3')
-	# cA6, cD6, cD5, cD4, cD3, cD2, cD1 = pywt.wavedec(eeg_train_data[11], 'db2', mode='constant', level=6)
-	# # bA6, bD6, bD5, bD4, bD3, bD2, bD1 = pywt.wavedec(eeg_train_data[11], 'db1', mode='constant', level=6)
-
-	# # fig1 = plt.figure(1) 
-	# # plt.plot(cD2, "r")
-	# # fig2 = plt.figure(2)
-	# # plt.plot(cD5, "b")
-
-	# print(energy_percents(eeg_train_data[0]))
-	# print(energy_percents(eeg_train_data[1]))
-	# # plt.plot(cD, "b")
-	# # fig3 = plt.figure(3)
-	# # plt.plot(eeg_train_data[11], "g")
-	# plt.show()
+	eeg_fir_bandpass(eeg_train_data, 3)
+	eeg_fir_bandpass(eeg_eval_data, 3)
 
 	start_time = time.time()
 
@@ -215,9 +194,9 @@ def main(unused_argv):
 
 
 	accuracies = []
-	num_runs = 10
+	num_runs = 20
 	steps_completed = 0
-	steps_per_train = 250
+	steps_per_train = 100
 	accuracies.append(0.5)
 
 	# Train the model
