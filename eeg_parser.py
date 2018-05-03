@@ -1,4 +1,3 @@
-
 import os
 from enum import Enum
 from pathlib import Path
@@ -117,11 +116,14 @@ def get_eeg_data():
 
 	# print_eeg_samples(eeg_data, patient_nums, record_nums, sample_nums, eeg_data_labels)
 
+	print("SHAPE EEG_DATA: ", len(eeg_data), " x ", len(eeg_data[1]), " x ", len(eeg_data[0][1]))
+
+
 	for i in range(len(eeg_data)):
 		eeg_data[i] = eeg_data[i].flatten()
 		# st = "feature #" + str(i) + " shape: " + str(eeg_data[i].shape) + "; label : " + str(eeg_data_labels[i]) + "; sample: " + str(sample_nums[i])
-		st = "feature #" + str(i) + " patient: " + str(patient_nums[i]) + "; record: " +  str(record_nums[i])+ "; sample: " + str(sample_nums[i]) +  "; label : " + str(eeg_data_labels[i]) 
-		print(st)
+		# st = "feature #" + str(i) + " patient: " + str(patient_nums[i]) + "; record: " +  str(record_nums[i])+ "; sample: " + str(sample_nums[i]) +  "; label : " + str(eeg_data_labels[i]) 
+		# print(st)
 
 
 	train_patient_num = 78
@@ -130,6 +132,8 @@ def get_eeg_data():
 	eval_data = []
 	eval_labels = []
 	runType=RunTypes.ShuffleAll
+
+	print("SHAPE EEG_DATA: ", len(eeg_data), " x ", len(eeg_data[1]))
 	
 	if runType == RunTypes.DivPatients:
 		#separate the training and eval data by the patient numbers
