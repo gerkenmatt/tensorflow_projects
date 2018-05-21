@@ -6,9 +6,36 @@ import matplotlib.pyplot as plt
 # import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fftpack
+from scipy.signal import convolve as sig_convolve
 from scipy import signal
 import pyedflib
 import pywt
+
+def eeg_fir_bandpass(eeg_data, num_channels): 
+	fs = 160 
+	nyq = fs / 2.0
+	N  = int(len(eeg_data[0]) / num_channels)
+	print("FIR Bandpass Filtering signals")
+
+	#create FIR filter
+	taps = signal.firwin(32, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
+
+	#iterate through all examples in the eeg data
+	for sig in eeg_data:
+		#iterate through each channel
+		for i in range(num_channels): 
+			subsig = []
+			subsig.append(sig[i*N:i*N+N])
+			filtered_sig = signal.lfilter(taps, 1.0, subsig)
+			# conv_result = sig_convolve(subsig, taps[np.newaxis, :], mode='valid')
+			# print(filtered_sig)
+			# plt.plot(filtered_sig[0])
+			# plt.show()
+			sig[i*N:i*N+N] = filtered_sig[0]
+
+	print("Done filtering")
+	return eeg_data
+
 
 def process_data(data): 
 	processed_data = []
@@ -165,6 +192,7 @@ def eeg_fft_plot(signal):
 	ax.plot(xf, 2.0/N * np.abs(yf[:N//2]))
 	plt.show()
 
+
 def eeg_power_spectral_density_plot(sig, num_channels): 
 	fs = 160
 	N  = int(len(sig) / num_channels)
@@ -201,21 +229,3 @@ def eeg_fir_bandpass_plot(sig, num_channels):
 	plt.ylabel('PSD [V**2/Hz]')
 	plt.show()
 
-def eeg_fir_bandpass(eeg_data, num_channels): 
-	fs = 160 
-	nyq = fs / 2.0
-	N  = int(len(eeg_data[0]) / num_channels)
-	print("FIR Bandpass Filtering signals")
-
-	#create FIR filter
-	taps = signal.firwin(N, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
-	
-	#iterate through all examples in the eeg data
-	for sig in eeg_data:
-		#iterate through each channel
-		for i in range(num_channels): 
-			filtered_sig = signal.lfilter(taps, 1.0, sig[i*N:i*N+N])
-			sig[i*N:i*N+N] = filtered_sig
-
-	print("Done filtering")
-	return eeg_data

@@ -177,14 +177,18 @@ def main(unused_argv):
 	print("EEG TRAIN LABELS SHAPE: ", str(eeg_train_labels.shape))
 	print("EEG EVAL LABELS SHAPE: ", str(eeg_eval_labels.shape))
 
+	eeg_power_spectral_density_plot(eeg_train_data[4], 3)
+	eeg_power_spectral_density_plot(eeg_eval_data[4], 3)
 	eeg_fir_bandpass(eeg_train_data, 3)
 	eeg_fir_bandpass(eeg_eval_data, 3)
+	eeg_power_spectral_density_plot(eeg_train_data[4], 3)
+	eeg_power_spectral_density_plot(eeg_eval_data[4], 3)
 
 	start_time = time.time()
 
 	# Create the Estimator
 	eeg_classifier = tf.estimator.Estimator(
-	  model_fn=eeg_cnn_model_5deep_fn, model_dir="/tmp/eeg_convnet_model")
+	  model_fn=eeg_cnn_model_fn, model_dir="/tmp/eeg_convnet_model")
 
 	# Set up logging for predictions
 	# Log the values in the "Softmax" tensor with label "probabilities"
@@ -196,7 +200,7 @@ def main(unused_argv):
 	accuracies = []
 	num_runs = 20
 	steps_completed = 0
-	steps_per_train = 100
+	steps_per_train = 250
 	accuracies.append(0.5)
 
 	# Train the model
