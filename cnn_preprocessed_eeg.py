@@ -8,7 +8,7 @@ from eeg_parser import get_eeg_samples
 from eeg_parser import train_test_split_shuffle
 from eeg_preprocessing import eeg_fft_plot
 from eeg_preprocessing  import eeg_power_spectral_density_plot
-from eeg_preprocessing import eeg_fir_bandpass_plot
+from eeg_preprocessing import eeg_fir_bandpass_samples
 from eeg_preprocessing import eeg_fir_bandpass
 from eeg_preprocessing import process_data
 from eeg_preprocessing  import energy_percents
@@ -17,6 +17,7 @@ from eeg_preprocessing import energy_band_percent_graphs
 import matplotlib.pyplot as plt
 import time
 import pywt
+import pandas as pd
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -26,9 +27,13 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Input Layer
 	# Reshape X to 3-D tensor: [batch_size, width, height, channels]
 	# eeg_signals are 640 pixels, and have three color channel
-	input_layer = tf.reshape(features["x"], [-1, 320, 3, 1])
+
+
+	input_layer = tf.reshape(features["x"], [-1, 1, 320, 3])
 	input_layer = tf.cast(input_layer, tf.float32)
+	#TODO: Move input layer reshaping to outside model function
 	print("\nINPUT LAYER SHAPE: \n", str(input_layer.shape))
+
 
 	# Convolutional Layer #1
 	# Computes 32 features using a 5x5 filter with ReLU activation.
@@ -36,12 +41,19 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Input Tensor Shape: [batch_size, 640, 3]
 	# Output Tensor Shape: [batch_size, 640, 96]
 	print (input_layer[1])
-	conv1 = tf.layers.conv2d(
-	    inputs=input_layer,
-	    filters=32,
-	    kernel_size=[5, 1],
-	    padding="same",
-	    activation=tf.nn.relu)
+	conv1 = tf.layers.separable_conv2d(
+		inputs=input_layer, 
+		filters=32, 
+		kernel_size=5, 
+		padding="same", 
+		activation=tf.nn.relu
+	)
+	# conv1 = tf.layers.conv2d(
+	#     inputs=input_layer,
+	#     filters=32,
+	#     kernel_size=[5, 1],
+	#     padding="same",
+	#     activation=tf.nn.relu)
 
 	print("\nCONV1 OUTPUT SHAPE: \n", str(conv1.shape))
 
@@ -51,8 +63,8 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Output Tensor Shape: [batch_size, 320, 96]
 	pool1 = tf.layers.max_pooling2d(
 	  inputs=conv1, 
-	  pool_size=[2, 1], 
-	  strides=[2, 1])
+	  pool_size=[1, 2], 
+	  strides=[1, 2])
 
 
 	print("\nPOOL1 OUTPUT SHAPE: \n", str(pool1.shape))
@@ -62,12 +74,13 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Padding is added to preserve width and height.
 	# Input Tensor Shape: [batch_size, 320, 96]
 	# Output Tensor Shape: [batch_size, 192]
-	conv2 = tf.layers.conv2d(
-	    inputs=pool1,
-	    filters=64,
-	    kernel_size=[4, 1],
-	    padding="same",
-	    activation=tf.nn.relu)
+	conv2 = tf.layers.separable_conv2d(
+		inputs=pool1, 
+		filters=64, 
+		kernel_size=5, 
+		padding="same", 
+		activation=tf.nn.relu
+	)
 	print("\nCONV2 OUTPUT SHAPE: \n", str(conv2.shape))
 
 
@@ -77,64 +90,66 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Output Tensor Shape: [batch_size, 160, 192]
 	pool2 = tf.layers.max_pooling2d(
 	  inputs=conv2, 
-	  pool_size=[2, 1], 
-	  strides=[2,1])
+	  pool_size=[1, 2], 
+	  strides=[1, 2])
 	print("\nPOOL2 OUTPUT SHAPE: \n", str(pool2.shape))
 
-
-	# Convolutional Layer #3
+		# Convolutional Layer #2
 	# Computes 64 features using a 5x5 filter.
 	# Padding is added to preserve width and height.
 	# Input Tensor Shape: [batch_size, 320, 96]
 	# Output Tensor Shape: [batch_size, 192]
-	conv3 = tf.layers.conv2d(
-	    inputs=pool2,
-	    filters=128,
-	    kernel_size=[3, 1],
-	    padding="same",
-	    activation=tf.nn.relu)
+	conv3 = tf.layers.separable_conv2d(
+		inputs=pool2, 
+		filters=128, 
+		kernel_size=5, 
+		padding="same", 
+		activation=tf.nn.relu
+	)
 	print("\nCONV3 OUTPUT SHAPE: \n", str(conv3.shape))
 
 
-	# Pooling Layer #3
+	# Pooling Layer #2
 	# Second max pooling layer with a 2x2 filter and stride of 2
 	# Input Tensor Shape: [batch_size, 320, 192]
 	# Output Tensor Shape: [batch_size, 160, 192]
 	pool3 = tf.layers.max_pooling2d(
 	  inputs=conv3, 
-	  pool_size=[2, 1], 
-	  strides=[2,1])
+	  pool_size=[1, 2], 
+	  strides=[1, 2])
 	print("\nPOOL3 OUTPUT SHAPE: \n", str(pool3.shape))
 
-	# Convolutional Layer #4
+		# Convolutional Layer #2
 	# Computes 64 features using a 5x5 filter.
 	# Padding is added to preserve width and height.
 	# Input Tensor Shape: [batch_size, 320, 96]
 	# Output Tensor Shape: [batch_size, 192]
-	conv4 = tf.layers.conv2d(
-	    inputs=pool3,
-	    filters=128,
-	    kernel_size=[3, 3],
-	    padding="same",
-	    activation=tf.nn.relu)
+	conv4 = tf.layers.separable_conv2d(
+		inputs=pool3, 
+		filters=256, 
+		kernel_size=5, 
+		padding="same", 
+		activation=tf.nn.relu
+	)
 	print("\nCONV4 OUTPUT SHAPE: \n", str(conv4.shape))
 
 
-	# Pooling Layer #4
+	# Pooling Layer #2
 	# Second max pooling layer with a 2x2 filter and stride of 2
 	# Input Tensor Shape: [batch_size, 320, 192]
 	# Output Tensor Shape: [batch_size, 160, 192]
 	pool4 = tf.layers.max_pooling2d(
 	  inputs=conv4, 
-	  pool_size=[2, 1], 
-	  strides=[2,1])
+	  pool_size=[1, 2], 
+	  strides=[1, 2])
 	print("\nPOOL4 OUTPUT SHAPE: \n", str(pool4.shape))
+
 
 
 	# Flatten tensor into a batch of vectors
 	# Input Tensor Shape: [batch_size, 160, 192]
 	# Output Tensor Shape: [batch_size, 160 * 192]
-	pool4_flat = tf.reshape(pool4, [-1, pool4.shape[1]* 3 * 128])
+	pool4_flat = tf.reshape(pool4, [-1, pool4.shape[1]* pool4.shape[2] * pool4.shape[3]])
 	print("\nPOOL4_FLAT OUTPUT SHAPE: \n", str(pool4_flat.shape))
 	
 
@@ -194,37 +209,62 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	return tf.estimator.EstimatorSpec(
 	    mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
+def stack_sigs(data): 
+
+	segments = np.empty((0,len(data[0].signal[0]),3))
+	labels = np.empty((0))
+	i = 0
+	for sample in data:
+		i += 1
+		if (i % 100 == 0): 
+			print(i)
+
+		sig = sample.signal
+		ch1 = sig[0]#.tolist()
+		ch2 = sig[1]#.tolist()
+		ch3 = sig[2]#.tolist()
+
+		segments = np.vstack([segments, np.dstack([ch1, ch2, ch3])])
+		labels = np.append(labels, sample.label)
+
+	return segments, labels
+
 
 def main(unused_argv):
 	# Load training and eval data"
 	print("starting")
 	eeg_samples = get_eeg_samples('SeniorProject/EEG_Dataset/')
-	train_data, train_labels, test_data, test_labels = train_test_split_shuffle(eeg_samples, 2000, 0.7)
+	# filtered_samples = eeg_fir_bandpass_samples(eeg_samples)
 
-	print("SAMPLE SHAPE: ", train_data[1].shape)
-	print("EEG TRAIN DATA SHAPE: ", str(train_data.shape))
-	print("EEG EVAL DATA SHAPE: ", str(test_data.shape))
-	print("EEG TRAIN LABELS SHAPE: ", str(train_labels.shape))
-	print("EEG EVAL LABELS SHAPE: ", str(test_labels.shape))
+	# test = 153
+	# plt.plot(eeg_samples[test].signal[1])
+	# plt.plot(filtered_samples[test].signal[1])
+	# plt.show()
+	# number_samples_used = len(eeg_samples)
+	number_samples_used = 1000
+	print("TOTAL NUMBER OF SAMPLES: ", number_samples_used)
+	train_samples, test_samples = train_test_split_shuffle(eeg_samples, number_samples_used, 0.7)
+	
+	print("stacking training sigs...")
+	train_x, train_y = stack_sigs(train_samples)
+	
+	print("stacking testing sigs..." )
+	test_x, test_y = stack_sigs(test_samples)
+	
+	print("TRAIN_X: ", train_x.shape)
+	print("TRAIN_Y: ", train_y.shape)
+	train_x = train_x.reshape(len(train_x), 1, 320, 3)
+	test_x = test_x.reshape(len(test_x), 1, 320, 3)
 
-	plt.plot(train_data[22])
-	plt.show()
-	eeg_fir_bandpass(train_data, 3)
-	eeg_fir_bandpass(test_data, 3)
+	train_y = np.asarray(train_y, dtype = np.int32)
+	test_y = np.asarray(test_y, dtype = np.int32)
 
-	plt.plot(train_data[22])
-	plt.show()
+	print("SAMPLE SHAPE: ", train_x[1].shape)
+	print("EEG TRAIN DATA SHAPE: ", str(train_x.shape))
+	print("EEG EVAL DATA SHAPE: ", str(test_x.shape))
+	print("EEG TRAIN LABELS SHAPE: ", str(train_y.shape))
+	print("EEG EVAL LABELS SHAPE: ", str(test_y.shape))
 
-	# processed_train_data = np.asarray(process_data(eeg_train_data))
-	# processed_eval_data = np.asarray(process_data(eeg_eval_data))
-
-	# # eeg_power_spectral_density_plot(eeg_train_data[22], 3)
-	# # eeg_fir_bandpass_plot(eeg_train_data[22], 3)
-
-	# print("processed train data shape: ", str(processed_train_data.shape))
-	# print("processed eval data shape: ", str(processed_eval_data.shape))
-
-	# energy_band_percent_graphs(eeg_train_data, eeg_train_labels)
 
 	start_time = time.time()
 
@@ -248,13 +288,11 @@ def main(unused_argv):
 	train_accuracies.append(0.5)
 
 
-
-
 	# Train the model
 	for i in range(num_runs):
 		train_input_fn = tf.estimator.inputs.numpy_input_fn(
-			x={"x": train_data},
-			y=train_labels,
+			x={"x": train_x},
+			y=train_y,
 			batch_size=20,
 			num_epochs=None,
 			shuffle=True)
@@ -266,16 +304,16 @@ def main(unused_argv):
 		steps_completed += steps_per_train
 		# Evaluate the model and print results
 		train_eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-			x={"x": train_data},
-			y=train_labels,
+			x={"x": train_x},
+			y=train_y,
 			num_epochs=1,
-			shuffle=False)
+			shuffle=True)
 
 		eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-			x={"x": test_data},
-			y=test_labels,
+			x={"x": test_x},
+			y=test_y,
 			num_epochs=1,
-			shuffle=False)
+			shuffle=True)
 
 
 		print("\n\nDONE TRAINING for run #", i + 1, ", NOW EVALUATE\n\n")

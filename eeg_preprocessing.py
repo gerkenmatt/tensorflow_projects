@@ -36,6 +36,32 @@ def eeg_fir_bandpass(eeg_data, num_channels):
 	print("Done filtering")
 	return eeg_data
 
+def eeg_fir_bandpass_samples(eeg_samples): 
+	fs = 160 
+	nyq = fs / 2.0
+
+	N  = len(eeg_samples[0].signal[0])
+	print("FIR Bandpass Filtering signals")
+
+	#create FIR filter
+	taps = signal.firwin(32, cutoff=[2.5/nyq, 20/nyq], window='hanning', pass_zero=False)
+
+	#iterate through all examples in the eeg data
+	for sample in eeg_samples:
+		#iterate through each channel
+		for i in range(len(sample.signal)): 
+			raw = sample.signal[i]
+			filtered_sig = signal.lfilter(taps, 1.0, raw)
+			# conv_result = sig_convolve(subsig, taps[np.newaxis, :], mode='valid')
+			# print(filtered_sig)
+			plt.plot(sample.signal[i], 'r')
+			plt.plot(filtered_sig, 'g')
+			plt.show()
+			sample.signal[i] = filtered_sig
+
+	print("Done filtering")
+	return eeg_samples
+
 
 def process_data(data): 
 	processed_data = []

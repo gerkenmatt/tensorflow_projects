@@ -30,10 +30,11 @@ def bias_variable(shape):
     return tf.Variable(initial)
 
 def depthwise_conv2d(x, W):
-    return tf.nn.depthwise_conv2d(x,W, [1, 1, 1, 1], padding='VALID')
+    return tf.nn.depthwise_conv2d(x, W, [1, 1, 1, 1], padding='VALID')
 
 def apply_depthwise_conv(x,kernel_size,num_channels,depth):
     weights = weight_variable([1, kernel_size, num_channels, depth])
+    print("WEIGHTS SHAPE: ", weights.shape)
     biases = bias_variable([depth * num_channels])
     return tf.nn.relu(tf.add(depthwise_conv2d(x, weights),biases))
 
@@ -48,17 +49,22 @@ def windows(data, size):
         start += (size / 2)
 
 def stack_sigs(data): 
-	segments = np.empty((0,window_size,3))
-	labels = np.empty((0))
 
-	for sample in data: 
+	segments = np.empty((0,len(data[0].signal[0]),3))
+	labels = np.empty((0))
+	i = 0
+	for sample in data:
+		i += 1
+		if (i % 100 == 0): 
+			print(i)
+
 		sig = sample.signal
-		print("shape sig: ", sig.shape)
-		ch1 = sig[0]
-		ch2 = sig[1]
-		ch3 = sig[2]
+		ch1 = sig[0]#.tolist()
+		ch2 = sig[1]#.tolist()
+		ch3 = sig[2]#.tolist()
+
 		segments = np.vstack([segments, np.dstack([ch1, ch2, ch3])])
-		labels = np.append(labels, data.label)
+		labels = np.append(labels, sample.label)
 
 	return segments, labels
 
@@ -66,8 +72,12 @@ def main(unused_argv):
 	# Load training and eval data"
 	print("starting")
 	eeg_samples = get_eeg_samples('SeniorProject/EEG_Dataset/')
-	train_samples, test_samples = train_test_split_shuffle(eeg_samples, 2000, 0.7)
+	number_samples_used = 1000
+	print("TOTAL NUMBER OF SAMPLES: ", number_samples_used)
+	train_samples, test_samples = train_test_split_shuffle(eeg_samples, number_samples_used, 0.7)
+	print("stacking training sigs...")
 	train_x, train_y = stack_sigs(train_samples)
+	print("stacking testing sigs..." )
 	test_x, test_y = stack_sigs(test_samples)
 
 	print("TRAIN_X: ", train_x.shape)
@@ -84,22 +94,24 @@ def main(unused_argv):
 	print("EEG TRAIN LABELS SHAPE: ", str(train_y.shape))
 	print("EEG EVAL LABELS SHAPE: ", str(test_y.shape))
 
-
 	input_height = 1
 	input_width = 320
 	num_labels = 2
 	num_channels = 3
 
 	batch_size = 10
-	kernel_size = 60
+	kernel_size = 10
 	depth = 60
 	num_hidden = 1000
 
-	learning_rate = 0.0001
+	learning_rate = 0.007
 	training_epochs = 8
 
-	# total_batches = train_x.shape[0] // batch_size
-	total_batches = 10
+	train_accuracies = [0.5]
+	test_accuracies = [0.5]
+
+	total_batches = train_x.shape[0] // batch_size
+	# total_batches = 10
 	print("total batches: ", total_batches)
 
 
@@ -107,11 +119,17 @@ def main(unused_argv):
 	Y = tf.placeholder(tf.float32, shape=[None,num_labels])
 
 	c = apply_depthwise_conv(X,kernel_size,num_channels,depth)
+	print("\nCONV1 OUTPUT SHAPE: \n", str(c.shape))
+
 	p = apply_max_pool(c,20,2)
+	print("\nPOOL1 OUTPUT SHAPE: \n", str(p.shape))
+
 	c = apply_depthwise_conv(p,6,depth*num_channels,depth//10)
+	print("\nCONV2 OUTPUT SHAPE: \n", str(c.shape))
 
 	shape = c.get_shape().as_list()
 	c_flat = tf.reshape(c, [-1, shape[1] * shape[2] * shape[3]])
+	print("\nCONV2_FLAT OUTPUT SHAPE: \n", str(c_flat.shape))
 
 	f_weights_l1 = weight_variable([shape[1] * shape[2] * depth * num_channels * (depth//10), num_hidden])
 	f_biases_l1 = bias_variable([num_hidden])
@@ -131,20 +149,48 @@ def main(unused_argv):
 	cost_history = np.empty(shape=[1],dtype=float)
 
 	with tf.Session() as session:
-	    tf.global_variables_initializer().run()
-	    for epoch in range(training_epochs):
-	        for b in range(total_batches):    
-	            print("batch: ", b)
-	            offset = (b * batch_size) % (train_y.shape[0] - batch_size)
-	            batch_x = train_x[offset:(offset + batch_size), :, :, :]
-	            batch_y = train_y[offset:(offset + batch_size), :]
-	            _, c = session.run([optimizer, loss],feed_dict={X: batch_x, Y : batch_y})
-	            cost_history = np.append(cost_history,c)
-	        print("calculating accuracies...")
-	        print ("Epoch: ",epoch," Training Loss: ",c," Training Accuracy: ",
-	              session.run(accuracy, feed_dict={X: train_x, Y: train_y}))
-	    
-	    print ("Testing Accuracy:", session.run(accuracy, feed_dict={X: test_x, Y: test_y}))
+		tf.global_variables_initializer().run()
+		for epoch in range(training_epochs):
+			for b in range(total_batches):    
+				print("batch: ", b)
+				offset = (b * batch_size) % (train_y.shape[0] - batch_size)
+				batch_x = train_x[offset:(offset + batch_size), :, :, :]
+				batch_y = train_y[offset:(offset + batch_size), :]
+				_, c = session.run([optimizer, loss],feed_dict={X: batch_x, Y : batch_y})
+				cost_history = np.append(cost_history,c)
+
+			print("calculating training accuracies...")
+			train_accuracy = session.run(accuracy, feed_dict={X: train_x, Y: train_y})
+			train_accuracies.append(train_accuracy)
+			print ("Epoch: ",epoch," Training Loss: ",c," Training Accuracy: ", train_accuracy)
+			test_accuracy = session.run(accuracy, feed_dict={X: test_x, Y: test_y})
+			test_accuracies.append(test_accuracy)
+
+			fig, ax = plt.subplots()
+			ax.plot(test_accuracies, "r")
+			ax.plot(train_accuracies, "b")
+
+			ax.set(xlabel='run number', ylabel='accuracy (%)',
+			   title='Test Results')
+			ax.grid()
+			plt.show()
+
+
+
+		print("calculating testing accuracies")
+		print ("Testing Accuracy:", session.run(accuracy, feed_dict={X: test_x, Y: test_y}))
+
+	fig, ax = plt.subplots()
+	ax.plot(test_accuracies, "r")
+	ax.plot(train_accuracies, "b")
+
+	ax.set(xlabel='run number', ylabel='accuracy (%)',
+	   title='Test Results')
+	ax.grid()
+
+
+	fig.savefig("test.png")
+	plt.show()
 
 if __name__ == "__main__":
 	tf.app.run()

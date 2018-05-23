@@ -79,7 +79,7 @@ def get_eeg_samples(db_dir_name, num_patients=109, num_records=14, channels=[9,1
 
 				for segment in segments: 
 					# segment = segment.flatten()
-					segment_data = EEG_Sample(segment, int(record_data[sample_num][1]), patient, record_num, sample_num)					
+					segment_data = EEG_Sample(segment, int(record_data[sample_num][1]) - 1, patient, record_num, sample_num)					
 					eeg_samples.append(segment_data)
 					# segment_data.print_sample_info()
 
@@ -92,7 +92,7 @@ def train_test_split_shuffle(eeg_samples, total_samples_used, train_test_percent
 	random.shuffle(eeg_samples)
 
 	#shorten the list of samples
-	eeg_samples = eeg_samples[:total_samples_used]
+	eeg_samples = np.asarray(eeg_samples[:total_samples_used])
 	# eeg_data = np.asarray([x.signal for x in eeg_samples])
 	# eeg_labels = np.asarray([x.label - 1 for x in eeg_samples])
 
