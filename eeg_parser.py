@@ -55,16 +55,17 @@ def get_eeg_samples(db_dir_name, num_patients=109, num_records=14, channels=[9,1
 
 	#the completed eeg data set to be sent to Tensorflow
 	eeg_samples = []
-	records = {'03', '07', '11'}	#these are the records than contain the left/right fist data
+	records1 = {'03', '07', '11'}
+	records2 = {'04', '08', '12'}	#these are the records than contain the left/right fist data
 
 	#iterate through every volunteer's directory (S001, S002,..., S109)
 	for patient in range(1, num_patients  + 1):
 		direc = rootdir + 'S%03d' % patient
 		st = "VOLUNTEER #" + '%03d' % patient
 		print (st)
-
+		sample_count = 0
 		#iterate through the EDF num_records in the directory (S001R01.edf, S001R02.edf,..., S001R14.edf)
-		for record_num in records: 
+		for record_num in records2: 
 			#create new EdfReader for the EDF record file
 			edf_reader = create_edf_reader(direc, patient, record_num)
 
@@ -79,9 +80,22 @@ def get_eeg_samples(db_dir_name, num_patients=109, num_records=14, channels=[9,1
 
 				for segment in segments: 
 					# segment = segment.flatten()
-					segment_data = EEG_Sample(segment, int(record_data[sample_num][1]) - 1, patient, record_num, sample_num)					
+					segment_data = EEG_Sample(segment, int(record_data[sample_num][1]) - 3, patient, record_num, sample_num)					
 					eeg_samples.append(segment_data)
 					# segment_data.print_sample_info()
+					sample_count += 1
+		print("   sample count: ", sample_count)
+
+
+	r = 0
+	l = 0
+	for sample in eeg_samples: 
+		if sample.label == 0: 
+			r += 1
+		if sample.label == 1: 
+			l += 1
+
+	print("right fist: ", r, ", left fist: ", l)
 
 	return eeg_samples
 
@@ -152,7 +166,8 @@ def static_randomize_data(data, labels):
 def create_edf_reader(direc, patient_num, record_num): 
 	edf_fname = 'S' + '%03d' % patient_num + 'R' + record_num + '.edf'
 	edf_fname = os.path.join(direc, edf_fname)
-	
+
+
 	return pyedflib.EdfReader(edf_fname)
 
 
@@ -161,6 +176,7 @@ def create_edf_reader(direc, patient_num, record_num):
 def parse_record_ann(direc, record_num): 
 	record_data = []
 	ann_fname = direc + '/ann' + record_num + '.txt'
+
 
 	#create array of starting samples for each task(T0, T1, T2) in the ann-file (i.e sample# 0, 672, 1328,...)
 	#create array of labels for each task in the ann-file (T0, T1, T2)
@@ -175,7 +191,7 @@ def parse_record_ann(direc, record_num):
 	# 	if record_data[i][1] != States.l_fist and record_data[i][1] == States.r_fist: 
 
 	for sample_data in record_data: 
-		if sample_data[1] != States.l_fist and sample_data[1] != States.r_fist: 
+		if sample_data[1] != States.l_fist_im and sample_data[1] != States.r_fist_im: 
 			record_data.remove(sample_data)
 
 	return record_data

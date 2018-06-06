@@ -54,13 +54,32 @@ def eeg_fir_bandpass_samples(eeg_samples):
 			filtered_sig = signal.lfilter(taps, 1.0, raw)
 			# conv_result = sig_convolve(subsig, taps[np.newaxis, :], mode='valid')
 			# print(filtered_sig)
-			plt.plot(sample.signal[i], 'r')
-			plt.plot(filtered_sig, 'g')
-			plt.show()
+			# plt.plot(sample.signal[i], 'r')
+			# plt.plot(filtered_sig, 'g')
+			# plt.show()
 			sample.signal[i] = filtered_sig
 
 	print("Done filtering")
 	return eeg_samples
+
+def eeg_dwt_signal(sig, num_channels):
+	signal_dwt = []
+
+	for i in range(num_channels): 
+		w = pywt.Wavelet('db4')
+		cA6, cD6, cD5, cD4, cD3, cD2, cD1 = pywt.wavedec(sig[i], 'db2', mode='constant', level=6)
+		signal_dwt.append(np.concatenate((cD3, cD4, cD5, cD6, cA6)))
+
+	return np.array(signal_dwt)
+
+
+#calculates cD4, cD5, cD6 for 3 channels for each signal in each sample
+#signals are saved as [[0cD4 + 0cD5 + 0cD6][1cD4 + 1cD5 + 1cD6][2cD4 + 2cD5 + 2cD6]]
+def eeg_dwt_samples(eeg_samples):
+	for sample in eeg_samples: 
+		sample.signal = eeg_dwt_signal(sample.signal, 3)
+
+	return eeg_samples 
 
 
 def process_data(data): 

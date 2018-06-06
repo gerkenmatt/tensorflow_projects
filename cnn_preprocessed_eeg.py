@@ -6,14 +6,10 @@ import numpy as np
 import tensorflow as tf
 from eeg_parser import get_eeg_samples
 from eeg_parser import train_test_split_shuffle
-from eeg_preprocessing import eeg_fft_plot
-from eeg_preprocessing  import eeg_power_spectral_density_plot
 from eeg_preprocessing import eeg_fir_bandpass_samples
 from eeg_preprocessing import eeg_fir_bandpass
-from eeg_preprocessing import process_data
-from eeg_preprocessing  import energy_percents
-from eeg_preprocessing import input_energy_graph
-from eeg_preprocessing import energy_band_percent_graphs
+from eeg_preprocessing import eeg_dwt_signal
+from eeg_preprocessing import eeg_dwt_samples
 import matplotlib.pyplot as plt
 import time
 import pywt
@@ -28,8 +24,9 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# Reshape X to 3-D tensor: [batch_size, width, height, channels]
 	# eeg_signals are 640 pixels, and have three color channel
 
-
-	input_layer = tf.reshape(features["x"], [-1, 1, 320, 3])
+	sig_len = features["x"].shape[2]
+	print("SIG LEN: ", sig_len)
+	input_layer = tf.reshape(features["x"], [-1, 1, sig_len, 3])
 	input_layer = tf.cast(input_layer, tf.float32)
 	#TODO: Move input layer reshaping to outside model function
 	print("\nINPUT LAYER SHAPE: \n", str(input_layer.shape))
@@ -119,38 +116,14 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	  strides=[1, 2])
 	print("\nPOOL3 OUTPUT SHAPE: \n", str(pool3.shape))
 
-		# Convolutional Layer #2
-	# Computes 64 features using a 5x5 filter.
-	# Padding is added to preserve width and height.
-	# Input Tensor Shape: [batch_size, 320, 96]
-	# Output Tensor Shape: [batch_size, 192]
-	conv4 = tf.layers.separable_conv2d(
-		inputs=pool3, 
-		filters=256, 
-		kernel_size=5, 
-		padding="same", 
-		activation=tf.nn.relu
-	)
-	print("\nCONV4 OUTPUT SHAPE: \n", str(conv4.shape))
-
-
-	# Pooling Layer #2
-	# Second max pooling layer with a 2x2 filter and stride of 2
-	# Input Tensor Shape: [batch_size, 320, 192]
-	# Output Tensor Shape: [batch_size, 160, 192]
-	pool4 = tf.layers.max_pooling2d(
-	  inputs=conv4, 
-	  pool_size=[1, 2], 
-	  strides=[1, 2])
-	print("\nPOOL4 OUTPUT SHAPE: \n", str(pool4.shape))
-
 
 
 	# Flatten tensor into a batch of vectors
 	# Input Tensor Shape: [batch_size, 160, 192]
 	# Output Tensor Shape: [batch_size, 160 * 192]
-	pool4_flat = tf.reshape(pool4, [-1, pool4.shape[1]* pool4.shape[2] * pool4.shape[3]])
-	print("\nPOOL4_FLAT OUTPUT SHAPE: \n", str(pool4_flat.shape))
+	pool3_flat = tf.reshape(pool3, [-1, pool3.shape[1]* pool3.shape[2] * pool3.shape[3]])
+	print("\nPOOL3_FLAT OUTPUT SHAPE: \n", str(pool3_flat.shape))
+
 	
 
 	# Dense Layer
@@ -159,8 +132,8 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 	# TODO: find out the number of neurons
 	# Output Tensor Shape: [batch_size, 1024]
 	dense = tf.layers.dense(
-	  inputs=pool4_flat, 
-	  units=1024, 
+	  inputs=pool3_flat, 
+	  units=2000, 
 	  activation=tf.nn.relu)
 	print("\nDENSE OUTPUT SHAPE: \n", str(dense.shape))
 
@@ -196,7 +169,7 @@ def eeg_cnn_model_preprocessed_fn(features, labels, mode):
 
 	# Configure the Training Op (for TRAIN mode)
 	if mode == tf.estimator.ModeKeys.TRAIN:
-	  optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+	  optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.04)
 	  train_op = optimizer.minimize(
 	      loss=loss,
 	      global_step=tf.train.get_global_step())
@@ -233,13 +206,16 @@ def stack_sigs(data):
 def main(unused_argv):
 	# Load training and eval data"
 	print("starting")
-	eeg_samples = get_eeg_samples('SeniorProject/EEG_Dataset/')
-	# filtered_samples = eeg_fir_bandpass_samples(eeg_samples)
+	eeg_samples = get_eeg_samples('SeniorProject/EEG_DATA/', num_segs=1)
+	eeg_samples = eeg_fir_bandpass_samples(eeg_samples)
 
-	# test = 153
-	# plt.plot(eeg_samples[test].signal[1])
-	# plt.plot(filtered_samples[test].signal[1])
-	# plt.show()
+	print("SIGNAL SHAPE PRE-DWT: ", eeg_samples[12].signal.shape)
+
+	# eeg_samples = eeg_dwt_samples(eeg_samples)
+
+	# print("SIGNAL SHAPE POST DWT: ", eeg_samples[12].signal.shape)
+	
+	sig_len = eeg_samples[0].signal.shape[1]
 	# number_samples_used = len(eeg_samples)
 	number_samples_used = 1000
 	print("TOTAL NUMBER OF SAMPLES: ", number_samples_used)
@@ -253,8 +229,9 @@ def main(unused_argv):
 	
 	print("TRAIN_X: ", train_x.shape)
 	print("TRAIN_Y: ", train_y.shape)
-	train_x = train_x.reshape(len(train_x), 1, 320, 3)
-	test_x = test_x.reshape(len(test_x), 1, 320, 3)
+	print("sig len: ", sig_len)
+	train_x = train_x.reshape(len(train_x), 1, sig_len, 3)
+	test_x = test_x.reshape(len(test_x), 1, sig_len, 3)
 
 	train_y = np.asarray(train_y, dtype = np.int32)
 	test_y = np.asarray(test_y, dtype = np.int32)
@@ -281,9 +258,9 @@ def main(unused_argv):
 
 	accuracies = []
 	train_accuracies = []
-	num_runs = 5
+	num_runs = 10
 	steps_completed = 0
-	steps_per_train = 100
+	steps_per_train = 30#100
 	accuracies.append(0.5)
 	train_accuracies.append(0.5)
 
@@ -293,7 +270,7 @@ def main(unused_argv):
 		train_input_fn = tf.estimator.inputs.numpy_input_fn(
 			x={"x": train_x},
 			y=train_y,
-			batch_size=20,
+			batch_size=36,
 			num_epochs=None,
 			shuffle=True)
 		eeg_classifier.train(
@@ -325,13 +302,24 @@ def main(unused_argv):
 		accuracies.append(eval_results['accuracy'])
 
 	print(accuracies)
-	print("completed ", str(steps_completed), "training steps in ", str(int((time.time() - start_time)/60)), "minutes")
+	runtime = int((time.time() - start_time)/60)
+	print("completed ", str(steps_completed), "training steps in ", str(runtime), "minutes")
 
 	# Note that using plt.subplots below is equivalent to using
 	# fig = plt.figure() and then ax = fig.add_subplot(111)
 	fig, ax = plt.subplots()
 	ax.plot(accuracies, "r")
 	ax.plot(train_accuracies, "b")
+
+	data_file = open("accuracies.txt", "w")
+	data_file.write("accuracies\n")
+	data_file.write(accuracies)
+	data_file.write("train accuracies\n")
+	data_file.write(train_accuracies)
+	data_file.write("runtime: ")
+	data_file.write(str(runtime))
+	data_file.close()
+
 
 	ax.set(xlabel='run number', ylabel='accuracy (%)',
 	   title='Test Results')
